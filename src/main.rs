@@ -14,6 +14,20 @@ struct GameState {
     curr_player: Player,
 }
 
+impl std::ops::Index<usize> for GameState {
+    type Output = Vector<BoardPoint>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.board.board[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for GameState {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.board.board[index]
+    }
+}
+
 #[derive(Clone, Data, Lens)]
 struct Board {
     board: Vector<Vector<BoardPoint>>,
@@ -49,20 +63,25 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
 
         let circle = Circle::new((mid_x, mid_y), 
             bounds.width().min(bounds.height()) / 4.0);
-        match data.board.board[i][j].owner {
+        match data[i][j].owner {
             Some(Player::Black) => ctx.fill(circle, &Color::BLACK),
             Some(Player::White) => ctx.fill(circle, &Color::WHITE),
             None => ()
         };
     });
 
-    Label::dynamic(move |data: &GameState, _| match data.board.board[i][j].number {
+    Label::dynamic(move |data: &GameState, _| match data[i][j].number {
             Some(num) => num.to_string(),
             None => "".to_string(),
         }).with_text_color(Color::RED)
         .center()
         .background(painter)
-        .on_click(move |_, data: &mut GameState, _| data.board.board[i][j].owner = Some(data.curr_player))
+        .on_click(move |_, data: &mut GameState, _|
+            data[i][j].owner = {
+                if data[i][j].owner == Some(data.curr_player) { None }
+                else { Some(data.curr_player) }
+            }
+        )
 }
 
 // Constructs a given row's UI
@@ -107,7 +126,7 @@ fn board_init() -> Board {
     for _ in 0..BOARD_SIZE {
         let mut row = Vector::new();
         for _ in 0..BOARD_SIZE {
-            row.push_front(BoardPoint { owner: Some(Player::White), number: Some(1) } );
+            row.push_front(BoardPoint { owner: None, number: Some(1) } );
         }
         board.push_front(row);
     }
