@@ -12,6 +12,7 @@ const LINE_WEIGHT: f64 = 5.0;
 struct GameState {
     board: Board,
     curr_player: Player,
+    curr_num: u32, // number of most recently placed stone
 }
 
 impl std::ops::Index<usize> for GameState {
@@ -42,6 +43,23 @@ struct BoardPoint {
 #[derive(Clone, Data, PartialEq, Copy)]
 enum Player {
     Black, White
+}
+
+impl GameState {
+    fn place_stone(&mut self, i: usize, j: usize) -> () {
+        if self[i][j].owner == Some(self.curr_player) { // remove stone
+            self[i][j].owner = None;
+            // decrement curr num if this is the most recently placed stone
+            if self[i][j].number == Some(self.curr_num) {
+                self.curr_num -= 1;
+                self[i][j].number = None;
+            }
+        } else { // place stone
+            self[i][j].owner = Some(self.curr_player);
+            self.curr_num += 1;
+            self[i][j].number = Some(self.curr_num);
+        }
+    }
 }
 
 // Constructs the UI for a given point (i, j) on the board
@@ -76,12 +94,7 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
         }).with_text_color(Color::RED)
         .center()
         .background(painter)
-        .on_click(move |_, data: &mut GameState, _|
-            data[i][j].owner = {
-                if data[i][j].owner == Some(data.curr_player) { None }
-                else { Some(data.curr_player) }
-            }
-        )
+        .on_click(move |_, data: &mut GameState, _| data.place_stone(i, j))
 }
 
 // Constructs a given row's UI
@@ -102,6 +115,7 @@ fn build_board_ui() -> impl Widget<GameState> {
     board_ui
 }
 
+// Constructs the UI for the control panel on the right-hand side
 fn build_controls() -> impl Widget<GameState> {
     Flex::column()
         .with_default_spacer()
@@ -126,7 +140,7 @@ fn board_init() -> Board {
     for _ in 0..BOARD_SIZE {
         let mut row = Vector::new();
         for _ in 0..BOARD_SIZE {
-            row.push_front(BoardPoint { owner: None, number: Some(1) } );
+            row.push_front(BoardPoint { owner: None, number: None } );
         }
         board.push_front(row);
     }
@@ -137,7 +151,11 @@ fn main() {
     let win = WindowDesc::new(build_ui())
         .window_size(WINDOW_SIZE)
         .title("Tsumego");
-    let initial_state = GameState { board: board_init(), curr_player: Player::Black };
+    let initial_state = GameState { 
+        board: board_init(), 
+        curr_player: Player::Black,
+        curr_num: 0,
+    };
 
     AppLauncher::with_window(win)
         .launch(initial_state)
