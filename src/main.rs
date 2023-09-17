@@ -1,5 +1,6 @@
-use druid::widget::{Label, Flex, LensWrap, Painter, AspectRatioBox};
-use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color};
+use druid::kurbo::Circle;
+use druid::widget::{Label, Flex, LensWrap, Painter};
+use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, PaintCtx, RenderContext, Color, Env};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
 
@@ -20,6 +21,7 @@ struct Board {
 #[derive(Clone, Data)]
 struct BoardPoint {
     owner: Option<Player>,
+    number: Option<u32>,
 }
 
 #[derive(Clone, Data, PartialEq)]
@@ -28,7 +30,7 @@ enum Player {
 }
 
 fn build_point_ui(i: usize, j: usize) -> impl Widget<Board> {
-    let painter = Painter::new(|ctx, data: &Board, _| {
+    let painter = Painter::new(move |ctx: &mut PaintCtx<'_, '_, '_>, data: &Board, _: &Env| {
         let bounds = ctx.size().to_rect();
         let mid_x = (bounds.x0 + bounds.x1) / 2.0;
         let mid_y = (bounds.y0 + bounds.y1) / 2.0;
@@ -42,8 +44,20 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<Board> {
             Line::new((bounds.x0, mid_y), (bounds.x1, mid_y)),
             &Color::BLACK, LINE_WEIGHT
         );
+
+        let circle = Circle::new((mid_x, mid_y), 
+            bounds.width().min(bounds.height()) / 4.0);
+        match data.board[i][j].owner {
+            Some(Player::Black) => ctx.fill(circle, &Color::BLACK),
+            Some(Player::White) => ctx.fill(circle, &Color::WHITE),
+            None => ()
+        };
     });
-    Label::new("x").center().background(painter)
+
+    Label::dynamic(move |data: &Board, _| match data.board[i][j].number {
+        Some(num) => num.to_string(),
+        None => "".to_string(),
+    }).with_text_color(Color::RED).center().background(painter)
 }
 
 // Constructs a given row's UI
@@ -75,7 +89,7 @@ fn board_init() -> Board {
     for _ in 0..BOARD_SIZE {
         let mut row = Vector::new();
         for _ in 0..BOARD_SIZE {
-            row.push_front(BoardPoint { owner: None } );
+            row.push_front(BoardPoint { owner: Some(Player::White), number: Some(1) } );
         }
         board.push_front(row);
     }
