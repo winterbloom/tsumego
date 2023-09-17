@@ -50,7 +50,7 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<Board> {
 fn build_row_ui(i: usize) -> impl Widget<Board> {
     let mut row_ui = Flex::row();
     for j in 0..BOARD_SIZE {
-        row_ui = row_ui.with_child(build_point_ui(i, j));
+        row_ui = row_ui.with_flex_child(build_point_ui(i, j), 1.0);
     }
     row_ui
 }
@@ -59,7 +59,7 @@ fn build_row_ui(i: usize) -> impl Widget<Board> {
 fn build_board_ui() -> impl Widget<Board> {
     let mut board_ui = Flex::column();
     for i in 0..BOARD_SIZE {
-        board_ui = board_ui.with_child(build_row_ui(i));
+        board_ui = board_ui.with_flex_child(build_row_ui(i), 1.0);
     }
     board_ui
 }
