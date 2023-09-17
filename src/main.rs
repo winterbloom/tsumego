@@ -1,5 +1,5 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, LensWrap, Painter, RadioGroup, Split};
+use druid::widget::{Label, Flex, Painter, RadioGroup, Split};
 use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
@@ -25,14 +25,14 @@ struct BoardPoint {
     number: Option<u32>,
 }
 
-#[derive(Clone, Data, PartialEq)]
+#[derive(Clone, Data, PartialEq, Copy)]
 enum Player {
     Black, White
 }
 
 // Constructs the UI for a given point (i, j) on the board
-fn build_point_ui(i: usize, j: usize) -> impl Widget<Board> {
-    let painter = Painter::new(move |ctx, data: &Board, _| {
+fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
+    let painter = Painter::new(move |ctx, data: &GameState, _| {
         let bounds = ctx.size().to_rect();
         let mid_x = (bounds.x0 + bounds.x1) / 2.0;
         let mid_y = (bounds.y0 + bounds.y1) / 2.0;
@@ -49,21 +49,24 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<Board> {
 
         let circle = Circle::new((mid_x, mid_y), 
             bounds.width().min(bounds.height()) / 4.0);
-        match data.board[i][j].owner {
+        match data.board.board[i][j].owner {
             Some(Player::Black) => ctx.fill(circle, &Color::BLACK),
             Some(Player::White) => ctx.fill(circle, &Color::WHITE),
             None => ()
         };
     });
 
-    Label::dynamic(move |data: &Board, _| match data.board[i][j].number {
-        Some(num) => num.to_string(),
-        None => "".to_string(),
-    }).with_text_color(Color::RED).center().background(painter)
+    Label::dynamic(move |data: &GameState, _| match data.board.board[i][j].number {
+            Some(num) => num.to_string(),
+            None => "".to_string(),
+        }).with_text_color(Color::RED)
+        .center()
+        .background(painter)
+        .on_click(move |_, data: &mut GameState, _| data.board.board[i][j].owner = Some(data.curr_player))
 }
 
 // Constructs a given row's UI
-fn build_row_ui(i: usize) -> impl Widget<Board> {
+fn build_row_ui(i: usize) -> impl Widget<GameState> {
     let mut row_ui = Flex::row();
     for j in 0..BOARD_SIZE {
         row_ui = row_ui.with_flex_child(build_point_ui(i, j), 1.0);
@@ -72,7 +75,7 @@ fn build_row_ui(i: usize) -> impl Widget<Board> {
 }
 
 // Constructs the board's UI, with its rows
-fn build_board_ui() -> impl Widget<Board> {
+fn build_board_ui() -> impl Widget<GameState> {
     let mut board_ui = Flex::column();
     for i in 0..BOARD_SIZE {
         board_ui = board_ui.with_flex_child(build_row_ui(i), 1.0);
@@ -83,6 +86,7 @@ fn build_board_ui() -> impl Widget<Board> {
 fn build_controls() -> impl Widget<GameState> {
     Flex::column()
         .with_default_spacer()
+        .with_child(Label::new("Current Player"))
         .with_flex_child(RadioGroup::row(
             vec![("Black", Player::Black), ("White", Player::White)]
         ), 1.0)
@@ -92,7 +96,7 @@ fn build_controls() -> impl Widget<GameState> {
 // Constructs the entire UI
 fn build_ui() -> impl Widget<GameState> {
     Split::columns(
-        LensWrap::new(build_board_ui(), GameState::board),
+        build_board_ui(),
         build_controls()
     ).split_point(0.7)
 }
