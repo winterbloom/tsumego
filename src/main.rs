@@ -1,6 +1,6 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, LensWrap, Painter};
-use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, PaintCtx, RenderContext, Color, Env};
+use druid::widget::{Label, Flex, LensWrap, Painter, RadioGroup, Split};
+use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
 
@@ -11,6 +11,7 @@ const LINE_WEIGHT: f64 = 5.0;
 #[derive(Clone, Data, Lens)]
 struct GameState {
     board: Board,
+    curr_player: Player,
 }
 
 #[derive(Clone, Data, Lens)]
@@ -29,8 +30,9 @@ enum Player {
     Black, White
 }
 
+// Constructs the UI for a given point (i, j) on the board
 fn build_point_ui(i: usize, j: usize) -> impl Widget<Board> {
-    let painter = Painter::new(move |ctx: &mut PaintCtx<'_, '_, '_>, data: &Board, _: &Env| {
+    let painter = Painter::new(move |ctx, data: &Board, _| {
         let bounds = ctx.size().to_rect();
         let mid_x = (bounds.x0 + bounds.x1) / 2.0;
         let mid_y = (bounds.y0 + bounds.y1) / 2.0;
@@ -78,9 +80,21 @@ fn build_board_ui() -> impl Widget<Board> {
     board_ui
 }
 
+fn build_controls() -> impl Widget<GameState> {
+    Flex::column()
+        .with_default_spacer()
+        .with_flex_child(RadioGroup::row(
+            vec![("Black", Player::Black), ("White", Player::White)]
+        ), 1.0)
+        .lens(GameState::curr_player)
+}
+
 // Constructs the entire UI
 fn build_ui() -> impl Widget<GameState> {
-    LensWrap::new(build_board_ui(), GameState::board)
+    Split::columns(
+        LensWrap::new(build_board_ui(), GameState::board),
+        build_controls()
+    ).split_point(0.7)
 }
 
 // Creates an empty board
@@ -100,7 +114,7 @@ fn main() {
     let win = WindowDesc::new(build_ui())
         .window_size(WINDOW_SIZE)
         .title("Tsumego");
-    let initial_state = GameState { board : board_init() };
+    let initial_state = GameState { board: board_init(), curr_player: Player::Black };
 
     AppLauncher::with_window(win)
         .launch(initial_state)
