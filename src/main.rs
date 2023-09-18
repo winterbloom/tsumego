@@ -1,12 +1,21 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, Painter, RadioGroup, Split};
+use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container};
 use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
 
-const WINDOW_SIZE: (f64, f64) = (600.0, 400.0);
-const BOARD_SIZE: usize = 9;
+const POINT_SIZE: f64 = 50.0;
+const NUM_POINTS: usize = 9;
+const WINDOW_SIZE: (f64, f64) = (POINT_SIZE * NUM_POINTS as f64 + 200.0, POINT_SIZE * NUM_POINTS as f64);
+const BOARD_COLOR: Color = Color::rgb8(252, 208, 96);
+
 const LINE_WEIGHT: f64 = 5.0;
+const LINE_COLOR: Color = Color::BLACK;
+
+const STONE_SIZE: f64 = 0.85; // Percentage of maximum size
+const STONE_WEIGHT: f64 = 1.0; // Outline weight
+
+// TODO: allow toggling of whether to use numbers; add button to reset board; start on rules
 
 #[derive(Clone, Data, Lens)]
 struct GameState {
@@ -46,47 +55,81 @@ enum Player {
 }
 
 impl GameState {
-    fn place_stone(&mut self, i: usize, j: usize) -> () {
-        if self[i][j].owner == Some(self.curr_player) { // remove stone
-            self[i][j].owner = None;
-            // decrement curr num if this is the most recently placed stone
-            if self[i][j].number == Some(self.curr_num) {
-                self.curr_num -= 1;
-                self[i][j].number = None;
-            }
-        } else { // place stone
-            self[i][j].owner = Some(self.curr_player);
-            self.curr_num += 1;
-            self[i][j].number = Some(self.curr_num);
+    fn toggle_stone(&mut self, i: usize, j: usize) -> () {
+        if self[i][j].owner == Some(self.curr_player) {
+            self.remove_stone(i, j);
+        } else {
+            self.place_stone(i, j);
         }
     }
+
+    // Removes the stone at the coordinates i, j
+    fn remove_stone(&mut self, i: usize, j: usize) -> () {
+        self[i][j].owner = None;
+        // decrement curr num if this is the most recently placed stone
+        if self[i][j].number == Some(self.curr_num) {
+            self.curr_num -= 1;
+            self[i][j].number = None;
+        }
+    }
+
+    // Places a stone at the coordinates i, j
+    fn place_stone(&mut self, i: usize, j: usize) -> () {
+        self[i][j].owner = Some(self.curr_player);
+        self.curr_num += 1;
+        self[i][j].number = Some(self.curr_num);
+    }
+}
+
+// Color corresponding to a given player
+fn player_color(player: Player) -> Color {
+    match player {
+        Player::Black => Color::BLACK,
+        Player::White => Color::WHITE
+    }
+}
+
+// Color corresponding to the opposite player
+fn player_color_inv(player: Player) -> Color {
+    match player {
+        Player::Black => Color::WHITE,
+        Player::White => Color::BLACK
+    }
+}
+
+// Creates a painter for a point, including possibly its stone
+// (not the number, though)
+fn point_painter_init(i: usize, j: usize) -> Painter<GameState> {
+    Painter::new(move |ctx, data: &GameState, _| {
+        let bounds = ctx.size().to_rect();
+        let mid_x = (bounds.x0 + bounds.x1) / 2.0;
+        let mid_y = (bounds.y0 + bounds.y1) / 2.0;
+        
+        // Vertical line
+        ctx.stroke(
+            Line::new((mid_x, bounds.y0 - 2.0), (mid_x, bounds.y1 + 2.0)),
+            &LINE_COLOR, LINE_WEIGHT
+        );
+        // Horizontal line
+        ctx.stroke(
+            Line::new((bounds.x0 - 2.0, mid_y), (bounds.x1 + 2.0, mid_y)),
+            &LINE_COLOR, LINE_WEIGHT
+        );
+
+        // Draw stone, if one exists
+        if let Some(player) = data[i][j].owner {
+            let circle = Circle::new((mid_x, mid_y), 
+                bounds.width().min(bounds.height()) / 2.0 * STONE_SIZE);
+
+            ctx.fill(circle, &player_color(player));
+            ctx.stroke(circle, &player_color_inv(player), STONE_WEIGHT);
+        }
+    })
 }
 
 // Constructs the UI for a given point (i, j) on the board
 fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
-    let painter = Painter::new(move |ctx, data: &GameState, _| {
-        let bounds = ctx.size().to_rect();
-        let mid_x = (bounds.x0 + bounds.x1) / 2.0;
-        let mid_y = (bounds.y0 + bounds.y1) / 2.0;
-        // Vertical line
-        ctx.stroke(
-            Line::new((mid_x, bounds.y0), (mid_x, bounds.y1)),
-            &Color::BLACK, LINE_WEIGHT
-        );
-        // Horizontal line
-        ctx.stroke(
-            Line::new((bounds.x0, mid_y), (bounds.x1, mid_y)),
-            &Color::BLACK, LINE_WEIGHT
-        );
-
-        let circle = Circle::new((mid_x, mid_y), 
-            bounds.width().min(bounds.height()) / 4.0);
-        match data[i][j].owner {
-            Some(Player::Black) => ctx.fill(circle, &Color::BLACK),
-            Some(Player::White) => ctx.fill(circle, &Color::WHITE),
-            None => ()
-        };
-    });
+    let painter = point_painter_init(i, j);
 
     Label::dynamic(move |data: &GameState, _| match data[i][j].number {
             Some(num) => num.to_string(),
@@ -94,13 +137,13 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
         }).with_text_color(Color::RED)
         .center()
         .background(painter)
-        .on_click(move |_, data: &mut GameState, _| data.place_stone(i, j))
+        .on_click(move |_, data: &mut GameState, _| data.toggle_stone(i, j))
 }
 
 // Constructs a given row's UI
 fn build_row_ui(i: usize) -> impl Widget<GameState> {
     let mut row_ui = Flex::row();
-    for j in 0..BOARD_SIZE {
+    for j in 0..NUM_POINTS {
         row_ui = row_ui.with_flex_child(build_point_ui(i, j), 1.0);
     }
     row_ui
@@ -109,7 +152,7 @@ fn build_row_ui(i: usize) -> impl Widget<GameState> {
 // Constructs the board's UI, with its rows
 fn build_board_ui() -> impl Widget<GameState> {
     let mut board_ui = Flex::column();
-    for i in 0..BOARD_SIZE {
+    for i in 0..NUM_POINTS {
         board_ui = board_ui.with_flex_child(build_row_ui(i), 1.0);
     }
     board_ui
@@ -129,17 +172,17 @@ fn build_controls() -> impl Widget<GameState> {
 // Constructs the entire UI
 fn build_ui() -> impl Widget<GameState> {
     Split::columns(
-        build_board_ui(),
-        build_controls()
+        Container::new(build_board_ui()).background(BOARD_COLOR),
+        Container::new(build_controls()).background(Color::BLACK)
     ).split_point(0.7)
 }
 
 // Creates an empty board
 fn board_init() -> Board {
     let mut board = Vector::new();
-    for _ in 0..BOARD_SIZE {
+    for _ in 0..NUM_POINTS {
         let mut row = Vector::new();
-        for _ in 0..BOARD_SIZE {
+        for _ in 0..NUM_POINTS {
             row.push_front(BoardPoint { owner: None, number: None } );
         }
         board.push_front(row);
@@ -150,7 +193,8 @@ fn board_init() -> Board {
 fn main() {
     let win = WindowDesc::new(build_ui())
         .window_size(WINDOW_SIZE)
-        .title("Tsumego");
+        .title("Tsumego")
+        .resizable(false);
     let initial_state = GameState { 
         board: board_init(), 
         curr_player: Player::Black,
