@@ -1,5 +1,5 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container};
+use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container, Button};
 use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
@@ -78,6 +78,17 @@ impl GameState {
         self[i][j].owner = Some(self.curr_player);
         self.curr_num += 1;
         self[i][j].number = Some(self.curr_num);
+    }
+
+    fn reset(&mut self) -> () {
+        self.curr_player = Player::Black;
+        self.curr_num = 0;
+        for row in self.board.board.iter_mut() {
+            for point in row.iter_mut() {
+                point.owner = None;
+                point.number = None;
+            }
+        }
     }
 }
 
@@ -163,10 +174,16 @@ fn build_controls() -> impl Widget<GameState> {
     Flex::column()
         .with_default_spacer()
         .with_child(Label::new("Current Player"))
-        .with_flex_child(RadioGroup::row(
-            vec![("Black", Player::Black), ("White", Player::White)]
-        ), 1.0)
-        .lens(GameState::curr_player)
+        .with_flex_child(
+            RadioGroup::row(
+                vec![("Black", Player::Black), ("White", Player::White)]
+            ).lens(GameState::curr_player),
+        1.0)
+        .with_default_spacer()
+        .with_flex_child(
+            Button::new("Reset")
+                .on_click(|_, data: &mut GameState, _| { data.reset() }),
+        1.0)
 }
 
 // Constructs the entire UI
