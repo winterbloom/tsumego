@@ -1,6 +1,6 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container, Button};
-use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color};
+use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container, Button, Switch, LabelText};
+use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color, EventCtx, Env};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
 
@@ -15,13 +15,14 @@ const LINE_COLOR: Color = Color::BLACK;
 const STONE_SIZE: f64 = 0.85; // Percentage of maximum size
 const STONE_WEIGHT: f64 = 1.0; // Outline weight
 
-// TODO: allow toggling of whether to use numbers; add button to reset board; start on rules
+// TODO: allow toggling of whether to use numbers; start on rules
 
 #[derive(Clone, Data, Lens)]
 struct GameState {
     board: Board,
     curr_player: Player,
     curr_num: u32, // number of most recently placed stone
+    locked: bool,
 }
 
 impl std::ops::Index<usize> for GameState {
@@ -80,6 +81,7 @@ impl GameState {
         self[i][j].number = Some(self.curr_num);
     }
 
+    // Completely resets the entire program
     fn reset(&mut self) -> () {
         self.curr_player = Player::Black;
         self.curr_num = 0;
@@ -169,6 +171,21 @@ fn build_board_ui() -> impl Widget<GameState> {
     board_ui
 }
 
+fn build_toggle<T: Data + Clone>(label: impl Into<LabelText<T>>,
+        left_name: impl Into<LabelText<T>>,
+        right_name: impl Into<LabelText<T>>,
+        left_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
+        right_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static) ->
+        impl Widget<T> {
+    Flex::row()
+        .with_default_spacer()
+        .with_flex_child(Label::new(label), 1.0)
+        .with_default_spacer()
+        .with_flex_child(Label::new(left_name).on_click(left_click), 1.0)
+        .with_default_spacer()
+        .with_flex_child(Label::new(right_name).on_click(right_click), 1.0)
+}
+
 // Constructs the UI for the control panel on the right-hand side
 fn build_controls() -> impl Widget<GameState> {
     Flex::column()
@@ -184,6 +201,12 @@ fn build_controls() -> impl Widget<GameState> {
             Button::new("Reset")
                 .on_click(|_, data: &mut GameState, _| { data.reset() }),
         1.0)
+        .with_default_spacer()
+        .with_flex_child(
+            build_toggle("Locked", "Yes", "No",
+            |_, data: &mut GameState, _| data.locked = true,
+            |_, data: &mut GameState, _| data.locked = false)
+        , 1.0)
 }
 
 // Constructs the entire UI
@@ -216,6 +239,7 @@ fn main() {
         board: board_init(), 
         curr_player: Player::Black,
         curr_num: 0,
+        locked: false
     };
 
     AppLauncher::with_window(win)
