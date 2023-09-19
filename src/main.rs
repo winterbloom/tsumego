@@ -1,5 +1,5 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container, Button, LabelText};
+use druid::widget::{Label, Flex, Painter, Split, Container, Button, LabelText};
 use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color, EventCtx, Env};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
@@ -183,6 +183,7 @@ fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
         let bounds = ctx.size().to_rect();
         if active_if(data, env) {
             ctx.fill(bounds, &button_color);
+            ctx.stroke(bounds, &text_color, 2.0);
         } else {
             // grey out the color if it's not active
             let (mut r, mut g, mut b, a) = button_color.as_rgba();
@@ -198,10 +199,10 @@ fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
             b = grey_color(b);
 
             ctx.fill(bounds, &Color::rgba(r, g, b, a));
-        }
 
-        if ctx.is_hot() {
-            ctx.stroke(bounds, &text_color, 2.0);
+            if ctx.is_hot() {
+                ctx.stroke(bounds, &text_color, 2.0);
+            }
         }
     });
 
@@ -213,7 +214,7 @@ fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
 }
 
 // Constructs a complete toggle button
-fn build_toggle<T: Data + Clone>(label: impl Into<LabelText<T>>,
+fn build_toggle<T: Data + Clone>(
         left_name: impl Into<LabelText<T>> + 'static,
         left_active_if: impl Fn(&T, &Env) -> bool + 'static,
         left_on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
@@ -224,8 +225,6 @@ fn build_toggle<T: Data + Clone>(label: impl Into<LabelText<T>>,
         right_button_color: Color, right_text_color: Color) ->
         impl Widget<T> {
     Flex::row()
-        .with_default_spacer()
-        .with_flex_child(Label::new(label), 1.0)
         .with_default_spacer()
         .with_flex_child(
             build_toggle_side(left_name, left_active_if, left_on_click, 
@@ -242,20 +241,21 @@ fn build_toggle<T: Data + Clone>(label: impl Into<LabelText<T>>,
 fn build_controls() -> impl Widget<GameState> {
     Flex::column()
         .with_default_spacer()
-        .with_child(Label::new("Current Player"))
-        .with_flex_child(
-            RadioGroup::row(
-                vec![("Black", Player::Black), ("White", Player::White)]
-            ).lens(GameState::curr_player),
-        1.0)
+        .with_flex_child(Label::new("Current Player"), 1.0)
+        .with_child(
+            build_toggle("Black",
+            |data: &GameState, _| data.curr_player == Player::Black,
+            |_, data: &mut GameState, _| data.curr_player = Player::Black,
+            Color::BLACK, Color::WHITE,
+            "White",
+            |data: &GameState, _| data.curr_player == Player::White,
+            |_, data: &mut GameState, _| data.curr_player = Player::White,
+            Color::WHITE, Color::BLACK)
+        )
         .with_default_spacer()
-        .with_flex_child(
-            Button::new("Reset")
-                .on_click(|_, data: &mut GameState, _| { data.reset() }),
-        1.0)
-        .with_default_spacer()
-        .with_flex_child(
-            build_toggle("Locked", "Yes",
+        .with_flex_child(Label::new("Locked"), 1.0)
+        .with_child(
+            build_toggle("Yes",
             |data: &GameState, _| data.locked,
             |_, data: &mut GameState, _| data.locked = true, 
             Color::GREEN, Color::WHITE,
@@ -263,14 +263,19 @@ fn build_controls() -> impl Widget<GameState> {
             |data: &GameState, _| !data.locked,
             |_, data: &mut GameState, _| data.locked = false,
             Color::RED, Color::WHITE)
-        , 1.0)
+        )
+        .with_default_spacer()
+        .with_flex_child(
+            Button::new("Reset")
+                .on_click(|_, data: &mut GameState, _| { data.reset() }),
+        1.0)
 }
 
 // Constructs the entire UI
 fn build_ui() -> impl Widget<GameState> {
     Split::columns(
         Container::new(build_board_ui()).background(BOARD_COLOR),
-        Container::new(build_controls()).background(Color::BLACK)
+        Container::new(build_controls()).background(Color::GRAY)
     ).split_point(0.7)
 }
 
