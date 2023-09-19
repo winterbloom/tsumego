@@ -8,6 +8,7 @@ const POINT_SIZE: f64 = 50.0;
 const NUM_POINTS: usize = 9;
 const WINDOW_SIZE: (f64, f64) = (POINT_SIZE * NUM_POINTS as f64 + 200.0, POINT_SIZE * NUM_POINTS as f64);
 const BOARD_COLOR: Color = Color::rgb8(252, 208, 96);
+const NUM_COLOR: Color = Color::rgb8(180, 0, 0);
 
 const LINE_WEIGHT: f64 = 5.0;
 const LINE_COLOR: Color = Color::BLACK;
@@ -52,7 +53,7 @@ struct BoardPoint {
 
 #[derive(Clone, Data, PartialEq, Copy)]
 enum Player {
-    Black, White
+    Black, White, BlackTemp, WhiteTemp
 }
 
 impl GameState {
@@ -76,10 +77,12 @@ impl GameState {
 
     // Places a stone at the coordinates i, j
     fn place_stone(&mut self, i: usize, j: usize) -> () {
-        self[i][j].owner = Some(self.curr_player);
         if self.locked {
+            self[i][j].owner = Some(temp(self.curr_player));
             self.curr_num += 1;
             self[i][j].number = Some(self.curr_num);
+        } else {
+            self[i][j].owner = Some(self.curr_player);
         }
     }
 
@@ -112,19 +115,32 @@ impl GameState {
     }
 }
 
-// Color corresponding to a given player
-fn player_color(player: Player) -> Color {
+// Gives the temporary version of a player
+fn temp(player: Player) -> Player {
     match player {
-        Player::Black => Color::BLACK,
-        Player::White => Color::WHITE
+        Player::Black => Player::BlackTemp,
+        Player::White => Player::WhiteTemp,
+        _ => player
     }
 }
 
-// Color corresponding to the opposite player
-fn player_color_inv(player: Player) -> Color {
+// Color of stone corresponding to a given player
+fn stone_color(player: Player) -> Color {
+    match player {
+        Player::Black => Color::BLACK,
+        Player::White => Color::WHITE,
+        Player::BlackTemp => Color::grey(0.15),
+        Player::WhiteTemp => Color::grey(0.9)
+    }
+}
+
+// Color to outline a stone with
+fn stone_outline_color(player: Player) -> Color {
     match player {
         Player::Black => Color::grey(0.2),
-        Player::White => Color::grey(0.9)
+        Player::White => Color::grey(0.9),
+        Player::BlackTemp => Color::grey(0.25),
+        Player::WhiteTemp => Color::grey(0.8)
     }
 }
 
@@ -152,8 +168,8 @@ fn point_painter_init(i: usize, j: usize) -> Painter<GameState> {
             let circle = Circle::new((mid_x, mid_y), 
                 bounds.width().min(bounds.height()) / 2.0 * STONE_SIZE);
 
-            ctx.fill(circle, &player_color(player));
-            ctx.stroke(circle, &player_color_inv(player), STONE_WEIGHT);
+            ctx.fill(circle, &stone_color(player));
+            ctx.stroke(circle, &stone_outline_color(player), STONE_WEIGHT);
         }
     })
 }
@@ -165,7 +181,8 @@ fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
     Label::dynamic(move |data: &GameState, _| match data[i][j].number {
             Some(num) => num.to_string(),
             None => "".to_string(),
-        }).with_text_color(Color::RED)
+        })
+        .with_text_color(NUM_COLOR)
         .center()
         .background(painter)
         .on_click(move |_, data: &mut GameState, _| data.toggle_stone(i, j))
