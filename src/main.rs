@@ -13,7 +13,7 @@ const LINE_WEIGHT: f64 = 5.0;
 const LINE_COLOR: Color = Color::BLACK;
 
 const STONE_SIZE: f64 = 0.85; // Percentage of maximum size
-const STONE_WEIGHT: f64 = 1.0; // Outline weight
+const STONE_WEIGHT: f64 = 2.0; // Outline weight
 
 // TODO: allow toggling of whether to use numbers; start on rules
 
@@ -77,8 +77,10 @@ impl GameState {
     // Places a stone at the coordinates i, j
     fn place_stone(&mut self, i: usize, j: usize) -> () {
         self[i][j].owner = Some(self.curr_player);
-        self.curr_num += 1;
-        self[i][j].number = Some(self.curr_num);
+        if self.locked {
+            self.curr_num += 1;
+            self[i][j].number = Some(self.curr_num);
+        }
     }
 
     // Completely resets the entire program
@@ -91,6 +93,22 @@ impl GameState {
                 point.number = None;
             }
         }
+    }
+
+    // Resets the temporary stones placed. Returns if anything was changed
+    fn reset_temp(&mut self) -> bool {
+        self.curr_num = 0;
+        let mut changed = false;
+        for row in self.board.board.iter_mut() {
+            for point in row.iter_mut() {
+                if point.number.is_some() { // Temporary stone
+                    changed = true;
+                    point.owner = None;
+                    point.number = None;
+                }
+            }
+        }
+        changed
     }
 }
 
@@ -105,8 +123,8 @@ fn player_color(player: Player) -> Color {
 // Color corresponding to the opposite player
 fn player_color_inv(player: Player) -> Color {
     match player {
-        Player::Black => Color::WHITE,
-        Player::White => Color::BLACK
+        Player::Black => Color::grey(0.2),
+        Player::White => Color::grey(0.9)
     }
 }
 
@@ -261,13 +279,20 @@ fn build_controls() -> impl Widget<GameState> {
             Color::GREEN, Color::WHITE,
             "No",
             |data: &GameState, _| !data.locked,
-            |_, data: &mut GameState, _| data.locked = false,
+            |_, data: &mut GameState, _| {
+                data.locked = false;
+                data.reset_temp();
+            },
             Color::RED, Color::WHITE)
         )
         .with_default_spacer()
         .with_flex_child(
             Button::new("Reset")
-                .on_click(|_, data: &mut GameState, _| { data.reset() }),
+                .on_click(|_, data: &mut GameState, _| {
+                    if !data.locked || !data.reset_temp() {
+                        data.reset()
+                    }
+                }),
         1.0)
 }
 
