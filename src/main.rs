@@ -1,5 +1,5 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container, Button, Switch, LabelText};
+use druid::widget::{Label, Flex, Painter, RadioGroup, Split, Container, Button, LabelText};
 use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color, EventCtx, Env};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
@@ -171,19 +171,71 @@ fn build_board_ui() -> impl Widget<GameState> {
     board_ui
 }
 
+// Constructs a UI for one side of a toggle button
+fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
+        active_if: impl Fn(&T, &Env) -> bool + 'static,
+        on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
+        button_color: Color, text_color: Color) ->
+        impl Widget<T> {
+
+    let painter = Painter::new(
+            move |ctx, data: &T, env| {
+        let bounds = ctx.size().to_rect();
+        if active_if(data, env) {
+            ctx.fill(bounds, &button_color);
+        } else {
+            // grey out the color if it's not active
+            let (mut r, mut g, mut b, a) = button_color.as_rgba();
+
+            fn grey_color(c: f64) -> f64 {
+                const CLR_AMT: f64 = 0.6; // percentage of color to keep
+                const GREY: f64 = 0.5;
+                c * CLR_AMT + GREY * (1.0 - CLR_AMT)
+            }
+
+            r = grey_color(r);
+            g = grey_color(g);
+            b = grey_color(b);
+
+            ctx.fill(bounds, &Color::rgba(r, g, b, a));
+        }
+
+        if ctx.is_hot() {
+            ctx.stroke(bounds, &text_color, 2.0);
+        }
+    });
+
+    Label::new(name)
+        .with_text_color(text_color)
+        .center()
+        .background(painter)
+        .on_click(on_click)
+}
+
+// Constructs a complete toggle button
 fn build_toggle<T: Data + Clone>(label: impl Into<LabelText<T>>,
-        left_name: impl Into<LabelText<T>>,
-        right_name: impl Into<LabelText<T>>,
-        left_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
-        right_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static) ->
+        left_name: impl Into<LabelText<T>> + 'static,
+        left_active_if: impl Fn(&T, &Env) -> bool + 'static,
+        left_on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
+        left_button_color: Color, left_text_color: Color,
+        right_name: impl Into<LabelText<T>> + 'static,
+        right_active_if: impl Fn(&T, &Env) -> bool + 'static,
+        right_on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
+        right_button_color: Color, right_text_color: Color) ->
         impl Widget<T> {
     Flex::row()
         .with_default_spacer()
         .with_flex_child(Label::new(label), 1.0)
         .with_default_spacer()
-        .with_flex_child(Label::new(left_name).on_click(left_click), 1.0)
+        .with_flex_child(
+            build_toggle_side(left_name, left_active_if, left_on_click, 
+            left_button_color, left_text_color),
+        1.0)
         .with_default_spacer()
-        .with_flex_child(Label::new(right_name).on_click(right_click), 1.0)
+        .with_flex_child(
+            build_toggle_side(right_name, right_active_if, right_on_click,
+            right_button_color, right_text_color)
+        , 1.0)
 }
 
 // Constructs the UI for the control panel on the right-hand side
@@ -203,9 +255,14 @@ fn build_controls() -> impl Widget<GameState> {
         1.0)
         .with_default_spacer()
         .with_flex_child(
-            build_toggle("Locked", "Yes", "No",
-            |_, data: &mut GameState, _| data.locked = true,
-            |_, data: &mut GameState, _| data.locked = false)
+            build_toggle("Locked", "Yes",
+            |data: &GameState, _| data.locked,
+            |_, data: &mut GameState, _| data.locked = true, 
+            Color::GREEN, Color::WHITE,
+            "No",
+            |data: &GameState, _| !data.locked,
+            |_, data: &mut GameState, _| data.locked = false,
+            Color::RED, Color::WHITE)
         , 1.0)
 }
 
