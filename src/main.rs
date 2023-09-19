@@ -7,6 +7,8 @@ use druid::piet::kurbo::Line;
 const POINT_SIZE: f64 = 50.0;
 const NUM_POINTS: usize = 9;
 const WINDOW_SIZE: (f64, f64) = (POINT_SIZE * NUM_POINTS as f64 + 200.0, POINT_SIZE * NUM_POINTS as f64);
+
+const CONTROLS_COLOR: Color = Color::GRAY;
 const BOARD_COLOR: Color = Color::rgb8(252, 208, 96);
 const NUM_COLOR: Color = Color::rgb8(180, 0, 0);
 
@@ -16,7 +18,7 @@ const LINE_COLOR: Color = Color::BLACK;
 const STONE_SIZE: f64 = 0.85; // Percentage of maximum size
 const STONE_WEIGHT: f64 = 2.0; // Outline weight
 
-// TODO: allow toggling of whether to use numbers; start on rules
+// TODO: start on rules
 
 #[derive(Clone, Data, Lens)]
 struct GameState {
@@ -24,6 +26,7 @@ struct GameState {
     curr_player: Player,
     curr_num: u32, // number of most recently placed stone
     locked: bool,
+    disp_nums: bool,
 }
 
 impl std::ops::Index<usize> for GameState {
@@ -178,9 +181,13 @@ fn point_painter_init(i: usize, j: usize) -> Painter<GameState> {
 fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
     let painter = point_painter_init(i, j);
 
-    Label::dynamic(move |data: &GameState, _| match data[i][j].number {
-            Some(num) => num.to_string(),
-            None => "".to_string(),
+    Label::dynamic(move |data: &GameState, _| {
+            if data.disp_nums {
+                if let Some(num) = data[i][j].number {
+                    return num.to_string();
+                }
+            };
+            "".to_string()
         })
         .with_text_color(NUM_COLOR)
         .center()
@@ -303,6 +310,18 @@ fn build_controls() -> impl Widget<GameState> {
             Color::RED, Color::WHITE)
         )
         .with_default_spacer()
+        .with_flex_child(Label::new("Display Numbers"), 1.0)
+        .with_child(
+            build_toggle("Yes",
+            |data: &GameState, _| data.disp_nums, 
+            |_, data: &mut GameState, _| data.disp_nums = true,
+            Color::BLACK, Color::WHITE,
+            "No",
+            |data: &GameState, _| !data.disp_nums,
+            |_, data: &mut GameState, _| data.disp_nums = false,
+            Color::BLACK, Color::WHITE)
+        )
+        .with_default_spacer()
         .with_flex_child(
             Button::new("Reset")
                 .on_click(|_, data: &mut GameState, _| {
@@ -317,7 +336,7 @@ fn build_controls() -> impl Widget<GameState> {
 fn build_ui() -> impl Widget<GameState> {
     Split::columns(
         Container::new(build_board_ui()).background(BOARD_COLOR),
-        Container::new(build_controls()).background(Color::GRAY)
+        Container::new(build_controls()).background(CONTROLS_COLOR)
     ).split_point(0.7)
 }
 
@@ -343,7 +362,8 @@ fn main() {
         board: board_init(), 
         curr_player: Player::Black,
         curr_num: 0,
-        locked: false
+        locked: false,
+        disp_nums: true
     };
 
     AppLauncher::with_window(win)
