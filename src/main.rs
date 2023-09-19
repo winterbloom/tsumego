@@ -256,6 +256,17 @@ fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
         .on_click(on_click)
 }
 
+fn build_button<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
+        active_if: impl Fn(&T, &Env) -> bool + 'static,
+        on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
+        button_color: Color, text_color: Color) ->
+        impl Widget<T> {
+    Flex::row()
+        .with_default_spacer()
+        .with_child(build_toggle_side(name, active_if, on_click, button_color, text_color))
+        .with_default_spacer()
+}
+
 // Constructs a complete toggle button
 fn build_toggle<T: Data + Clone>(
         left_name: impl Into<LabelText<T>> + 'static,
@@ -326,14 +337,15 @@ fn build_controls() -> impl Widget<GameState> {
                 Color::BLACK, Color::WHITE)
             )
             .with_default_spacer()
-            .with_flex_child(
-                Button::new("Reset")
-                    .on_click(|_, data: &mut GameState, _| {
-                        if !data.locked || !data.reset_temp() {
-                            data.reset()
-                        }
-                    }),
-            1.0)
+            .with_child(
+                build_button("Reset",
+                |_, _| false,
+                |_, data: &mut GameState, _| {
+                    if !data.locked || !data.reset_temp() {
+                        data.reset()
+                    }
+                }, Color::BLACK, Color::WHITE)
+            )
     ).split_point(0.7)
 }
 
