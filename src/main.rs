@@ -152,17 +152,17 @@ fn stone_outline_color(player: Player) -> Color {
 fn point_painter_init(i: usize, j: usize) -> Painter<GameState> {
     Painter::new(move |ctx, data: &GameState, _| {
         let bounds = ctx.size().to_rect();
-        let mid_x = (bounds.x0 + bounds.x1) / 2.0;
-        let mid_y = (bounds.y0 + bounds.y1) / 2.0;
+        let (mid_x, mid_y) = bounds.center().into();
+        let inset = bounds.inset(2.0);
         
         // Vertical line
         ctx.stroke(
-            Line::new((mid_x, bounds.y0 - 2.0), (mid_x, bounds.y1 + 2.0)),
+            Line::new((mid_x, inset.y0), (mid_x, inset.y1)),
             &LINE_COLOR, LINE_WEIGHT
         );
         // Horizontal line
         ctx.stroke(
-            Line::new((bounds.x0 - 2.0, mid_y), (bounds.x1 + 2.0, mid_y)),
+            Line::new((inset.x0, mid_y), (inset.x1, mid_y)),
             &LINE_COLOR, LINE_WEIGHT
         );
 
@@ -222,7 +222,7 @@ fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
 
     let painter = Painter::new(
             move |ctx, data: &T, env| {
-        let bounds = ctx.size().to_rect();
+        let bounds = ctx.size().to_rect().inset(-2.0).to_rounded_rect(5.0);
         if active_if(data, env) {
             ctx.fill(bounds, &button_color);
             ctx.stroke(bounds, &text_color, 2.0);
@@ -250,6 +250,7 @@ fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
 
     Label::new(name)
         .with_text_color(text_color)
+        .padding(5.0)
         .center()
         .background(painter)
         .on_click(on_click)
@@ -275,61 +276,65 @@ fn build_toggle<T: Data + Clone>(
         .with_default_spacer()
         .with_flex_child(
             build_toggle_side(right_name, right_active_if, right_on_click,
-            right_button_color, right_text_color)
-        , 1.0)
+            right_button_color, right_text_color),
+        1.0)
+        .with_default_spacer()
 }
 
 // Constructs the UI for the control panel on the right-hand side
 fn build_controls() -> impl Widget<GameState> {
-    Flex::column()
-        .with_default_spacer()
-        .with_flex_child(Label::new("Current Player"), 1.0)
-        .with_child(
-            build_toggle("Black",
-            |data: &GameState, _| data.curr_player == Player::Black,
-            |_, data: &mut GameState, _| data.curr_player = Player::Black,
-            Color::BLACK, Color::WHITE,
-            "White",
-            |data: &GameState, _| data.curr_player == Player::White,
-            |_, data: &mut GameState, _| data.curr_player = Player::White,
-            Color::WHITE, Color::BLACK)
-        )
-        .with_default_spacer()
-        .with_flex_child(Label::new("Locked"), 1.0)
-        .with_child(
-            build_toggle("Yes",
-            |data: &GameState, _| data.locked,
-            |_, data: &mut GameState, _| data.locked = true, 
-            Color::GREEN, Color::WHITE,
-            "No",
-            |data: &GameState, _| !data.locked,
-            |_, data: &mut GameState, _| {
-                data.locked = false;
-                data.reset_temp();
-            },
-            Color::RED, Color::WHITE)
-        )
-        .with_default_spacer()
-        .with_flex_child(Label::new("Display Numbers"), 1.0)
-        .with_child(
-            build_toggle("Yes",
-            |data: &GameState, _| data.disp_nums, 
-            |_, data: &mut GameState, _| data.disp_nums = true,
-            Color::BLACK, Color::WHITE,
-            "No",
-            |data: &GameState, _| !data.disp_nums,
-            |_, data: &mut GameState, _| data.disp_nums = false,
-            Color::BLACK, Color::WHITE)
-        )
-        .with_default_spacer()
-        .with_flex_child(
-            Button::new("Reset")
-                .on_click(|_, data: &mut GameState, _| {
-                    if !data.locked || !data.reset_temp() {
-                        data.reset()
-                    }
-                }),
-        1.0)
+    Split::rows(
+        Flex::column()
+            .with_default_spacer()
+            .with_flex_child(Label::new("Current Player"), 1.0)
+            .with_child(
+                build_toggle("Black",
+                |data: &GameState, _| data.curr_player == Player::Black,
+                |_, data: &mut GameState, _| data.curr_player = Player::Black,
+                Color::BLACK, Color::WHITE,
+                "White",
+                |data: &GameState, _| data.curr_player == Player::White,
+                |_, data: &mut GameState, _| data.curr_player = Player::White,
+                Color::WHITE, Color::BLACK)
+            )
+            .with_default_spacer()
+            .with_flex_child(Label::new("Locked"), 1.0)
+            .with_child(
+                build_toggle("Yes",
+                |data: &GameState, _| data.locked,
+                |_, data: &mut GameState, _| data.locked = true, 
+                Color::GREEN, Color::WHITE,
+                "No",
+                |data: &GameState, _| !data.locked,
+                |_, data: &mut GameState, _| {
+                    data.locked = false;
+                    data.reset_temp();
+                },
+                Color::RED, Color::WHITE)
+            ),
+        Flex::column()
+            .with_default_spacer()
+            .with_flex_child(Label::new("Display Numbers"), 1.0)
+            .with_child(
+                build_toggle("Yes",
+                |data: &GameState, _| data.disp_nums, 
+                |_, data: &mut GameState, _| data.disp_nums = true,
+                Color::BLACK, Color::WHITE,
+                "No",
+                |data: &GameState, _| !data.disp_nums,
+                |_, data: &mut GameState, _| data.disp_nums = false,
+                Color::BLACK, Color::WHITE)
+            )
+            .with_default_spacer()
+            .with_flex_child(
+                Button::new("Reset")
+                    .on_click(|_, data: &mut GameState, _| {
+                        if !data.locked || !data.reset_temp() {
+                            data.reset()
+                        }
+                    }),
+            1.0)
+    ).split_point(0.7)
 }
 
 // Constructs the entire UI
