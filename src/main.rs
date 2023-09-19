@@ -1,5 +1,5 @@
 use druid::kurbo::Circle;
-use druid::widget::{Label, Flex, Painter, Split, Container, Button, LabelText};
+use druid::widget::{Label, Flex, Painter, Split, Container, LabelText};
 use druid::{AppLauncher, Widget, WindowDesc, Data, Lens, WidgetExt, RenderContext, Color, EventCtx, Env};
 use druid::im::Vector;
 use druid::piet::kurbo::Line;
@@ -213,57 +213,58 @@ fn build_board_ui() -> impl Widget<GameState> {
     board_ui
 }
 
+// Creates a greyer version of a color
+fn grey_color(color: Color) -> Color {
+    let (mut r, mut g, mut b, a) = color.as_rgba();
+
+    fn grey_c(c: f64) -> f64 {
+        const CLR_AMT: f64 = 0.6; // percentage of color to keep
+        const GREY: f64 = 0.5;
+        c * CLR_AMT + GREY * (1.0 - CLR_AMT)
+    }
+
+    r = grey_c(r);
+    g = grey_c(g);
+    b = grey_c(b);
+
+    Color::rgba(r, g, b, a)
+}
+
 // Constructs a UI for one side of a toggle button
 fn build_toggle_side<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
         active_if: impl Fn(&T, &Env) -> bool + 'static,
         on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
-        button_color: Color, text_color: Color) ->
+        button_color: Color, text_color: Color, grey_out: bool) ->
         impl Widget<T> {
 
     let painter = Painter::new(
             move |ctx, data: &T, env| {
         let bounds = ctx.size().to_rect().inset(-2.0).to_rounded_rect(5.0);
-        if active_if(data, env) {
+        if active_if(data, env) || !grey_out {
             ctx.fill(bounds, &button_color);
+        } else { // grey out the button
+            ctx.fill(bounds, &grey_color(button_color));
+        }
+        if active_if(data, env) || ctx.is_hot() {
             ctx.stroke(bounds, &text_color, 2.0);
-        } else {
-            // grey out the color if it's not active
-            let (mut r, mut g, mut b, a) = button_color.as_rgba();
-
-            fn grey_color(c: f64) -> f64 {
-                const CLR_AMT: f64 = 0.6; // percentage of color to keep
-                const GREY: f64 = 0.5;
-                c * CLR_AMT + GREY * (1.0 - CLR_AMT)
-            }
-
-            r = grey_color(r);
-            g = grey_color(g);
-            b = grey_color(b);
-
-            ctx.fill(bounds, &Color::rgba(r, g, b, a));
-
-            if ctx.is_hot() {
-                ctx.stroke(bounds, &text_color, 2.0);
-            }
         }
     });
 
     Label::new(name)
         .with_text_color(text_color)
-        .padding(5.0)
+        .padding((10.0, 5.0, 10.0, 5.0))
         .center()
         .background(painter)
         .on_click(on_click)
 }
 
 fn build_button<T: Data + Clone>(name: impl Into<LabelText<T>> + 'static,
-        active_if: impl Fn(&T, &Env) -> bool + 'static,
         on_click: impl Fn(&mut EventCtx<'_, '_>, &mut T, &Env) + 'static,
         button_color: Color, text_color: Color) ->
         impl Widget<T> {
     Flex::row()
         .with_default_spacer()
-        .with_child(build_toggle_side(name, active_if, on_click, button_color, text_color))
+        .with_child(build_toggle_side(name, |_, _| false, on_click, button_color, text_color, false))
         .with_default_spacer()
 }
 
@@ -282,12 +283,12 @@ fn build_toggle<T: Data + Clone>(
         .with_default_spacer()
         .with_flex_child(
             build_toggle_side(left_name, left_active_if, left_on_click, 
-            left_button_color, left_text_color),
+            left_button_color, left_text_color, true),
         1.0)
         .with_default_spacer()
         .with_flex_child(
             build_toggle_side(right_name, right_active_if, right_on_click,
-            right_button_color, right_text_color),
+            right_button_color, right_text_color, true),
         1.0)
         .with_default_spacer()
 }
@@ -339,7 +340,6 @@ fn build_controls() -> impl Widget<GameState> {
             .with_default_spacer()
             .with_child(
                 build_button("Reset",
-                |_, _| false,
                 |_, data: &mut GameState, _| {
                     if !data.locked || !data.reset_temp() {
                         data.reset()
