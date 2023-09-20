@@ -14,7 +14,7 @@ pub mod druid_use {
 pub mod consts {
     use crate::druid_use::*;
     pub const POINT_SIZE: f64 = 50.0;
-    pub const NUM_POINTS: usize = 9;
+    pub const NUM_POINTS: Ptidx = 9;
     pub const WINDOW_SIZE: (f64, f64) = (POINT_SIZE * NUM_POINTS as f64 + 200.0,
         POINT_SIZE * NUM_POINTS as f64);
 
@@ -27,9 +27,9 @@ pub mod consts {
 
     pub const STONE_SIZE: f64 = 0.85; // Percentage of maximum size
     pub const STONE_WEIGHT: f64 = 2.0; // Outline weight
-}
 
-// TODO: start on rules
+    pub type Ptidx = usize;
+}
 
 #[derive(Clone, Data, Lens)]
 pub struct GameState {
@@ -40,16 +40,16 @@ pub struct GameState {
     disp_nums: bool,
 }
 
-impl std::ops::Index<usize> for GameState {
+impl std::ops::Index<Ptidx> for GameState {
     type Output = Vector<BoardPoint>;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, index: Ptidx) -> &Self::Output {
         &self.board.board[index]
     }
 }
 
-impl std::ops::IndexMut<usize> for GameState {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+impl std::ops::IndexMut<Ptidx> for GameState {
+    fn index_mut(&mut self, index: Ptidx) -> &mut Self::Output {
         &mut self.board.board[index]
     }
 }
@@ -61,29 +61,66 @@ struct Board {
 
 #[derive(Clone, Data)]
 pub struct BoardPoint {
-    owner: Option<Player>,
+    owner: Option<Stone>,
     number: Option<u32>,
 }
 
 #[derive(Clone, Data, PartialEq, Copy)]
 enum Player {
-    Black, White, BlackTemp, WhiteTemp
+    Black, White
 }
 
-impl Player {
-    // Gives the temporary version of a player
-    const fn temp(player: Player) -> Player {
-        match player {
-            Player::Black => Player::BlackTemp,
-            Player::White => Player::WhiteTemp,
-            _ => player
+#[derive(Clone, Data, PartialEq, Copy)]
+enum Stone {
+    Player(Player), BlackTemp, WhiteTemp
+}
+
+impl From<Stone> for Player {
+    // Gives the player version of a stone, discarding temporary state
+    fn from(stone: Stone) -> Self {
+        match stone {
+            Stone::Player(player) => player,
+            Stone::BlackTemp => Self::Black,
+            Stone::WhiteTemp => Self::White
+        }
+    }
+}
+
+impl Stone {
+    // Gives the temporary stone version of a player
+    const fn temp_from_player(player: Player) -> Self {
+        Self::temp(Self::Player(player))
+    }
+
+    // Gives the temporary version of a stone
+    const fn temp(stone: Self) -> Self {
+        match stone {
+            Self::Player(Player::Black) => Self::BlackTemp,
+            Self::Player(Player::White) => Self::WhiteTemp,
+            _ => stone
         }
     }
 }
 
 impl GameState {
-    fn toggle_stone(&mut self, i: usize, j: usize) -> () {
-        if self[i][j].owner == Some(self.curr_player) {
+    fn clicked_on(&mut self, i: Ptidx, j: Ptidx) -> () {
+        if !self.locked {
+            self.toggle_stone(i, j);
+        } else if self.is_valid(i, j) {
+            self[i][j].owner = Some(Stone::temp_from_player(self.curr_player));
+            self.curr_num += 1;
+            self[i][j].number = Some(self.curr_num);
+        }
+    }
+
+    // Verifies if a stone can validly be placed at i, j
+    fn is_valid(&mut self, i: Ptidx, j: Ptidx) -> bool {
+        true
+    }
+
+    // Toggles the stone at a point, without enforcing rules
+    fn toggle_stone(&mut self, i: Ptidx, j: Ptidx) -> () {
+        if self[i][j].owner == Some(Stone::Player(self.curr_player)) {
             self.remove_stone(i, j);
         } else {
             self.place_stone(i, j);
@@ -91,24 +128,16 @@ impl GameState {
     }
 
     // Removes the stone at the coordinates i, j
-    fn remove_stone(&mut self, i: usize, j: usize) -> () {
+    fn remove_stone(&mut self, i: Ptidx, j: Ptidx) -> () {
         self[i][j].owner = None;
-        // decrement curr num if this is the most recently placed stone
-        if self[i][j].number == Some(self.curr_num) {
-            self.curr_num -= 1;
-            self[i][j].number = None;
-        }
     }
 
     // Places a stone at the coordinates i, j
-    fn place_stone(&mut self, i: usize, j: usize) -> () {
-        if self.locked {
-            self[i][j].owner = Some(Player::temp(self.curr_player));
-            self.curr_num += 1;
-            self[i][j].number = Some(self.curr_num);
-        } else {
-            self[i][j].owner = Some(self.curr_player);
-        }
+    fn place_stone(&mut self, i: Ptidx, j: Ptidx) -> () {
+        self[i][j].owner = Some(
+            if self.locked { Stone::temp_from_player(self.curr_player) }
+            else { Stone::Player(self.curr_player) }
+        );
     }
 
     // Completely resets the entire program

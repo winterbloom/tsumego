@@ -75,30 +75,31 @@ mod board_ui {
     use crate::consts::*;
     use crate::GameState;
     use crate::Player;
+    use crate::Stone;
 
-    // Color of stone corresponding to a given player
-    const fn stone_color(player: Player) -> Color {
-        match player {
-            Player::Black => Color::BLACK,
-            Player::White => Color::WHITE,
-            Player::BlackTemp => Color::grey8(40),
-            Player::WhiteTemp => Color::grey8(230)
+    // Color of stone corresponding to a given stone
+    const fn stone_color(stone: Stone) -> Color {
+        match stone {
+            Stone::Player(Player::Black) => Color::BLACK,
+            Stone::Player(Player::White) => Color::WHITE,
+            Stone::BlackTemp => Color::grey8(40),
+            Stone::WhiteTemp => Color::grey8(230)
         }
     }
 
     // Color to outline a stone with
-    const fn stone_outline_color(player: Player) -> Color {
-        match player {
-            Player::Black => Color::grey8(50),
-            Player::White => Color::grey8(230),
-            Player::BlackTemp => Color::grey8(65),
-            Player::WhiteTemp => Color::grey8(200)
+    const fn stone_outline_color(stone: Stone) -> Color {
+        match stone {
+            Stone::Player(Player::Black) => Color::grey8(50),
+            Stone::Player(Player::White) => Color::grey8(230),
+            Stone::BlackTemp => Color::grey8(65),
+            Stone::WhiteTemp => Color::grey8(200)
         }
     }
 
     // Creates a painter for a point, including possibly its stone
     // (not the number, though)
-    fn point_painter_init(i: usize, j: usize) -> Painter<GameState> {
+    fn point_painter_init(i: Ptidx, j: Ptidx) -> Painter<GameState> {
         Painter::new(move |ctx, data: &GameState, _| {
             let bounds = ctx.size().to_rect();
             let (mid_x, mid_y) = bounds.center().into();
@@ -116,18 +117,18 @@ mod board_ui {
             );
 
             // Draw stone, if one exists
-            if let Some(player) = data[i][j].owner {
+            if let Some(stone) = data[i][j].owner {
                 let circle = Circle::new((mid_x, mid_y), 
                     bounds.width().min(bounds.height()) / 2.0 * STONE_SIZE);
 
-                ctx.fill(circle, &stone_color(player));
-                ctx.stroke(circle, &stone_outline_color(player), STONE_WEIGHT);
+                ctx.fill(circle, &stone_color(stone));
+                ctx.stroke(circle, &stone_outline_color(stone), STONE_WEIGHT);
             }
         })
     }
 
     // Constructs the UI for a given point (i, j) on the board
-    fn build_point_ui(i: usize, j: usize) -> impl Widget<GameState> {
+    fn build_point_ui(i: Ptidx, j: Ptidx) -> impl Widget<GameState> {
         let painter = point_painter_init(i, j);
 
         Label::dynamic(move |data: &GameState, _| {
@@ -141,11 +142,11 @@ mod board_ui {
             .with_text_color(NUM_COLOR)
             .center()
             .background(painter)
-            .on_click(move |_, data: &mut GameState, _| data.toggle_stone(i, j))
+            .on_click(move |_, data: &mut GameState, _| data.clicked_on(i, j))
     }
 
     // Constructs a given row's UI
-    fn build_row_ui(i: usize) -> impl Widget<GameState> {
+    fn build_row_ui(i: Ptidx) -> impl Widget<GameState> {
         let mut row_ui = Flex::row();
         for j in 0..NUM_POINTS {
             row_ui = row_ui.with_flex_child(build_point_ui(i, j), 1.0);
