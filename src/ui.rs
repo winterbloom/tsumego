@@ -34,14 +34,16 @@ fn build_controls() -> impl Widget<GameState> {
             .with_flex_child(Label::new("Game Mode"), 1.0)
             .with_child(
                 widgets::build_toggle("Play",
-                |data: &GameState, _| data.play,
-                |_, data: &mut GameState, _| data.play = true, 
+                |data: &GameState, _| data.playing,
+                |_, data: &mut GameState, _| {
+                    data.playing = true;
+                }, 
                 Color::GREEN, Color::WHITE,
                 "Setup",
-                |data: &GameState, _| !data.play,
+                |data: &GameState, _| !data.playing,
                 |_, data: &mut GameState, _| {
-                    data.play = false;
-                    data.reset_temp();
+                    data.playing = false;
+                    data.reset_to_setup();
                 },
                 Color::RED, Color::WHITE)
             ),
@@ -62,7 +64,7 @@ fn build_controls() -> impl Widget<GameState> {
             .with_child(
                 widgets::build_button("Reset",
                 |_, data: &mut GameState, _| {
-                    if !data.play || !data.reset_temp() {
+                    if !data.playing || !data.reset_to_setup() {
                         data.reset()
                     }
                 }, Color::BLACK, Color::WHITE)
@@ -80,26 +82,26 @@ mod board_ui {
     // Color of stone corresponding to a given stone
     const fn stone_color(stone: Stone) -> Color {
         match stone {
-            Stone::Player(Player::Black) => Color::grey8(40),
-            Stone::Player(Player::White) => Color::grey8(230),
-            Stone::BlackTemp => Color::BLACK,
-            Stone::WhiteTemp => Color::WHITE
+            Stone::Player(Player::Black) => Color::BLACK,
+            Stone::Player(Player::White) => Color::WHITE,
+            Stone::BlackSetup => Color::grey8(40),
+            Stone::WhiteSetup => Color::grey8(230)
         }
     }
 
     // Color to outline a stone with
     const fn stone_outline_color(stone: Stone) -> Color {
         match stone {
-            Stone::Player(Player::Black) => Color::grey8(65),
-            Stone::Player(Player::White) => Color::grey8(200),
-            Stone::BlackTemp => Color::grey8(50),
-            Stone::WhiteTemp => Color::grey8(230)
+            Stone::Player(Player::Black) => Color::grey8(50),
+            Stone::Player(Player::White) => Color::grey8(230),
+            Stone::BlackSetup => Color::grey8(65),
+            Stone::WhiteSetup => Color::grey8(200)
         }
     }
 
     // Creates a painter for a point, including possibly its stone
     // (not the number, though)
-    fn point_painter_init(i: Ptidx, j: Ptidx) -> Painter<GameState> {
+    fn point_painter_init(i: PtIdx, j: PtIdx) -> Painter<GameState> {
         Painter::new(move |ctx, data: &GameState, _| {
             let bounds = ctx.size().to_rect();
             let (mid_x, mid_y) = bounds.center().into();
@@ -128,7 +130,7 @@ mod board_ui {
     }
 
     // Constructs the UI for a given point (i, j) on the board
-    fn build_point_ui(i: Ptidx, j: Ptidx) -> impl Widget<GameState> {
+    fn build_point_ui(i: PtIdx, j: PtIdx) -> impl Widget<GameState> {
         let painter = point_painter_init(i, j);
 
         Label::dynamic(move |data: &GameState, _| {
@@ -146,7 +148,7 @@ mod board_ui {
     }
 
     // Constructs a given row's UI
-    fn build_row_ui(i: Ptidx) -> impl Widget<GameState> {
+    fn build_row_ui(i: PtIdx) -> impl Widget<GameState> {
         let mut row_ui = Flex::row();
         for j in 0..NUM_POINTS {
             row_ui = row_ui.with_flex_child(build_point_ui(i, j), 1.0);
