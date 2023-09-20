@@ -36,7 +36,7 @@ pub struct GameState {
     board: Board,
     curr_player: Player,
     curr_num: u32, // number of most recently placed stone
-    locked: bool,
+    play: bool,
     disp_nums: bool,
 }
 
@@ -104,7 +104,7 @@ impl Stone {
 
 impl GameState {
     fn clicked_on(&mut self, i: Ptidx, j: Ptidx) -> () {
-        if !self.locked {
+        if !self.play {
             self.toggle_stone(i, j);
         } else if self.is_valid(i, j) {
             self[i][j].owner = Some(Stone::temp_from_player(self.curr_player));
@@ -135,7 +135,7 @@ impl GameState {
     // Places a stone at the coordinates i, j
     fn place_stone(&mut self, i: Ptidx, j: Ptidx) -> () {
         self[i][j].owner = Some(
-            if self.locked { Stone::temp_from_player(self.curr_player) }
+            if self.play { Stone::temp_from_player(self.curr_player) }
             else { Stone::Player(self.curr_player) }
         );
     }
@@ -191,7 +191,7 @@ fn main() {
         board: board_init(), 
         curr_player: Player::Black,
         curr_num: 0,
-        locked: false,
+        play: false,
         disp_nums: true
     };
 

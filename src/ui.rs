@@ -31,16 +31,16 @@ fn build_controls() -> impl Widget<GameState> {
                 Color::WHITE, Color::BLACK)
             )
             .with_default_spacer()
-            .with_flex_child(Label::new("Locked"), 1.0)
+            .with_flex_child(Label::new("Game Mode"), 1.0)
             .with_child(
-                widgets::build_toggle("Yes",
-                |data: &GameState, _| data.locked,
-                |_, data: &mut GameState, _| data.locked = true, 
+                widgets::build_toggle("Play",
+                |data: &GameState, _| data.play,
+                |_, data: &mut GameState, _| data.play = true, 
                 Color::GREEN, Color::WHITE,
-                "No",
-                |data: &GameState, _| !data.locked,
+                "Setup",
+                |data: &GameState, _| !data.play,
                 |_, data: &mut GameState, _| {
-                    data.locked = false;
+                    data.play = false;
                     data.reset_temp();
                 },
                 Color::RED, Color::WHITE)
@@ -62,7 +62,7 @@ fn build_controls() -> impl Widget<GameState> {
             .with_child(
                 widgets::build_button("Reset",
                 |_, data: &mut GameState, _| {
-                    if !data.locked || !data.reset_temp() {
+                    if !data.play || !data.reset_temp() {
                         data.reset()
                     }
                 }, Color::BLACK, Color::WHITE)
@@ -80,20 +80,20 @@ mod board_ui {
     // Color of stone corresponding to a given stone
     const fn stone_color(stone: Stone) -> Color {
         match stone {
-            Stone::Player(Player::Black) => Color::BLACK,
-            Stone::Player(Player::White) => Color::WHITE,
-            Stone::BlackTemp => Color::grey8(40),
-            Stone::WhiteTemp => Color::grey8(230)
+            Stone::Player(Player::Black) => Color::grey8(40),
+            Stone::Player(Player::White) => Color::grey8(230),
+            Stone::BlackTemp => Color::BLACK,
+            Stone::WhiteTemp => Color::WHITE
         }
     }
 
     // Color to outline a stone with
     const fn stone_outline_color(stone: Stone) -> Color {
         match stone {
-            Stone::Player(Player::Black) => Color::grey8(50),
-            Stone::Player(Player::White) => Color::grey8(230),
-            Stone::BlackTemp => Color::grey8(65),
-            Stone::WhiteTemp => Color::grey8(200)
+            Stone::Player(Player::Black) => Color::grey8(65),
+            Stone::Player(Player::White) => Color::grey8(200),
+            Stone::BlackTemp => Color::grey8(50),
+            Stone::WhiteTemp => Color::grey8(230)
         }
     }
 
