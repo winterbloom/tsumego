@@ -62,10 +62,15 @@ fn build_controls() -> impl Widget<GameState> {
             )
             .with_default_spacer()
             .with_child(
-                widgets::build_button("Reset",
+                widgets::build_button(|data: &GameState, _: &Env| {
+                    if data.has_game_stones() { "Reset Play" }
+                    else { "Reset All" }
+                },
                 |_, data: &mut GameState, _| {
-                    if !data.playing || !data.reset_to_setup() {
-                        data.reset()
+                    if data.has_game_stones() {
+                        data.reset_to_setup();
+                    } else {
+                        data.reset();
                     }
                 }, Color::BLACK, Color::WHITE)
             )

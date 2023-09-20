@@ -109,6 +109,7 @@ impl GameState {
         if !self.playing {
             self.toggle_setup_stone(i, j);
         } else if self.is_valid(i, j) {
+            // TODO: rules
             self[i][j].owner = Some(Stone::Player(self.curr_player));
             self.curr_num += 1;
             self[i][j].number = Some(self.curr_num);
@@ -173,11 +174,8 @@ impl GameState {
     }
 
     // Resets the game stones placed. Returns if anything was changed
-    fn reset_to_setup(&mut self) -> bool {
+    fn reset_to_setup(&mut self) -> () {
         self.playing = false;
-        if !self.has_game_stones() {
-            return false;
-        }
         self.curr_num = 0;
         for row in self.board.board.iter_mut() {
             for point in row.iter_mut() {
@@ -187,7 +185,6 @@ impl GameState {
                 }
             }
         }
-        true
     }
 }
 
